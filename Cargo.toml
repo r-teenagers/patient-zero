@@ -1,0 +1,14 @@
+[package]
+name = "patient_zero"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+color-eyre = "0.6.4"
+poise = "0.6.1"
+serde = "1.0.219"
+serenity = { version = "0.12.4", features = ["builder", "collector", "client", "framework", "gateway", "http", "model", "utils", "simd_json", "rustls_backend", "chrono"] }
+tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread"] }
+toml = "0.8.22"
+tracing = { version = "0.1.41", features = ["release_max_level_info", "max_level_debug"] }
+tracing-subscriber = { version = "0.3.19", features = ["tracing-log"] }
