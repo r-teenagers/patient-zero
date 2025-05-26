@@ -7,6 +7,10 @@ pub async fn new_message(
     data: &crate::Data,
     msg: &serenity::Message,
 ) -> Result<(), crate::Error> {
+    if msg.author.bot {
+        return Ok(());
+    }
+
     info!("new message {}", msg.content);
 
     // FIXME: maybe don't lock on every message if possible? or have per-channel locks?
@@ -27,9 +31,13 @@ pub async fn new_message(
 
         let last_author = buf.get_last();
         buf.push(msg.author.id.get(), msg.id.get());
-        debug!("{:?}", buf);
+        trace!("buffer for {}: {:?}", msg.channel_id, buf);
         last_author
     };
+
+    // TODO: allow double credit for batch infections?
+
+    // TODO: check if last_author is infected
 
     Ok(())
 }
