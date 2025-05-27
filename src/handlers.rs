@@ -1,6 +1,9 @@
 use poise::serenity_prelude as serenity;
 
-use crate::helpers::MessageBuffer;
+use crate::{
+    helpers::{self, MessageBuffer},
+    models::{InfectionEvent, InfectionRecord, Player},
+};
 
 pub async fn new_message(
     ctx: &serenity::Context,
@@ -35,8 +38,46 @@ pub async fn new_message(
         last_author
     };
 
-    // TODO: check if last_author is infected
-    // TODO: allow double credit for batch infections?
+    // last_author may not actually exist if the message was sent before the bot started;
+    // if not, they cannot possibly be infected anyway
+    let author_data = match last_author {
+        Some(a) => {
+            let a = a.to_string();
+            sqlx::query_as!(Player, "SELECT * FROM players WHERE id = ?", a)
+                .fetch_optional(&data.db_pool)
+                .await?
+        }
+        None => None,
+    };
+
+    let should_infect = match author_data {
+        Some(ref a) => a.infected,
+        None => false,
+    };
+
+    let player_id = msg.author.id.to_string();
+    let player = sqlx::query_as!(
+        Player,
+        "INSERT OR REPLACE INTO players (id, infected) VALUES (?, ?)",
+        player_id,
+        should_infect,
+    )
+    .fetch_optional(&data.db_pool)
+    .await?
+    .unwrap();
+
+    if should_infect {
+        let author_data = author_data.unwrap();
+        InfectionRecord {
+            event: InfectionEvent::Infected,
+            target: player_id,
+            source: author_data.id,
+            reason: "Talked below an infected player".to_string(),
+            recorded_at: helpers::now() as i64,
+        }
+        .save(&data.db_pool)
+        .await?;
+    }
 
     Ok(())
 }

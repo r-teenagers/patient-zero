@@ -20,6 +20,7 @@ mod commands;
 mod config;
 mod handlers;
 mod helpers;
+mod models;
 
 struct Data {
     started_at: u64,
@@ -91,10 +92,7 @@ async fn main() -> Result<(), Error> {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 Ok(Data {
-                    started_at: SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs(),
+                    started_at: helpers::now(),
                     game_config: config.game,
                     channels: Mutex::new(HashMap::new()),
                     db_pool: pool,

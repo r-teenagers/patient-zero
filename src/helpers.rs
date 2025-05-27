@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use color_eyre::{Result, eyre::bail};
 
 /// A simple ring buffer to maintain the last `CAPACITY` message IDs/users in a channel
@@ -90,4 +92,11 @@ impl<const CAPACITY: usize> MessageBuffer<CAPACITY> {
         let idx = lhs + rhs;
         if idx >= CAPACITY { idx - CAPACITY } else { idx }
     }
+}
+
+pub fn now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }

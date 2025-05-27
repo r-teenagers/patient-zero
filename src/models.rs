@@ -1,0 +1,38 @@
+use color_eyre::Result;
+use sqlx::{Database, Executor, SqliteExecutor};
+
+pub struct Player {
+    // this is disgusting - converting to a string is gross but unfortunately
+    // sqlite doesn't natively have a u64 type :(
+    pub id: String,
+    pub infected: bool,
+}
+
+#[derive(sqlx::Type)]
+#[sqlx(rename_all = "lowercase")]
+pub enum InfectionEvent {
+    Infected,
+    Cured,
+}
+
+pub struct InfectionRecord {
+    pub event: InfectionEvent,
+    pub target: String,
+    pub source: String,
+    pub reason: String,
+    pub recorded_at: i64,
+}
+
+impl InfectionRecord {
+    pub async fn save(self, e: impl SqliteExecutor<'_>) -> Result<()> {
+        sqlx::query!(
+            "INSERT INTO infection_records (event, target, source, reason, recorded_at) VALUES (?, ?, ?, ?, ?)",
+            self.event,
+            self.target,
+            self.source,
+            self.reason,
+            self.recorded_at
+        ).execute(e).await?;
+        Ok(())
+    }
+}
