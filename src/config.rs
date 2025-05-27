@@ -1,7 +1,4 @@
-use color_eyre::{
-    Result,
-    eyre::{WrapErr, bail},
-};
+use color_eyre::{Result, eyre::WrapErr};
 
 #[derive(serde::Deserialize)]
 pub struct Config {
@@ -12,7 +9,7 @@ pub struct Config {
 #[derive(serde::Deserialize)]
 pub struct BotConfig {
     pub token: String,
-    pub db_path: String,
+    pub db_url: String,
 }
 
 #[derive(serde::Deserialize)]

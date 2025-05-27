@@ -35,9 +35,8 @@ pub async fn new_message(
         last_author
     };
 
-    // TODO: allow double credit for batch infections?
-
     // TODO: check if last_author is infected
+    // TODO: allow double credit for batch infections?
 
     Ok(())
 }

@@ -8,6 +8,7 @@ use color_eyre::{Result, eyre::WrapErr};
 use helpers::MessageBuffer;
 use poise::serenity_prelude as serenity;
 use serenity::GatewayIntents;
+use sqlx::SqlitePool;
 use tokio::sync::Mutex;
 use tracing::Level;
 use tracing_subscriber::{filter, prelude::*};
@@ -25,6 +26,7 @@ struct Data {
     /// map of channel IDs to the ID of the last user to message there
     channels: Mutex<HashMap<u64, MessageBuffer<10>>>,
     game_config: config::GameConfig,
+    db_pool: SqlitePool,
 }
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -69,6 +71,9 @@ async fn main() -> Result<(), Error> {
 
     let config = config::load(&Path::new("./pzero.toml")).expect("pzero.toml not found!");
 
+    let pool = SqlitePool::connect(&config.bot.db_url).await?;
+    sqlx::migrate!().run(&pool).await?;
+
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::GUILD_MEMBERS
@@ -92,6 +97,7 @@ async fn main() -> Result<(), Error> {
                         .as_secs(),
                     game_config: config.game,
                     channels: Mutex::new(HashMap::new()),
+                    db_pool: pool,
                 })
             })
         })
