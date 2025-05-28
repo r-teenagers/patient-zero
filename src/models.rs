@@ -6,6 +6,7 @@ pub struct Player {
     // sqlite doesn't natively have a u64 type :(
     pub id: String,
     pub infected: bool,
+    pub total_messages: i64,
 }
 
 #[derive(sqlx::Type)]
@@ -21,17 +22,19 @@ pub struct InfectionRecord {
     pub source: String,
     pub reason: String,
     pub recorded_at: i64,
+    pub target_messages: i64,
 }
 
 impl InfectionRecord {
     pub async fn save(self, e: impl SqliteExecutor<'_>) -> Result<()> {
         sqlx::query!(
-            "INSERT INTO infection_records (event, target, source, reason, recorded_at) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO infection_records (event, target, source, reason, recorded_at, target_messages) VALUES (?, ?, ?, ?, ?, ?)",
             self.event,
             self.target,
             self.source,
             self.reason,
-            self.recorded_at
+            self.recorded_at,
+            self.target_messages,
         ).execute(e).await?;
         Ok(())
     }

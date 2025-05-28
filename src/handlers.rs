@@ -56,15 +56,22 @@ pub async fn new_message(
     };
 
     let player_id = msg.author.id.to_string();
-    let player = sqlx::query_as!(
-        Player,
-        "INSERT OR REPLACE INTO players (id, infected) VALUES (?, ?)",
+    let total_messages = sqlx::query!(
+        r#"
+        INSERT INTO players (id, infected, total_messages) VALUES (?, ?, 1)
+        ON CONFLICT (id) DO 
+        UPDATE SET total_messages = total_messages + 1 WHERE id = ?
+        RETURNING (total_messages)
+        "#,
         player_id,
         should_infect,
+        player_id,
     )
-    .fetch_optional(&data.db_pool)
+    .fetch_one(&data.db_pool)
     .await?
-    .unwrap();
+    .total_messages;
+
+    debug!("player {} has {} messages", player_id, total_messages);
 
     if should_infect {
         let author_data = author_data.unwrap();
@@ -74,6 +81,7 @@ pub async fn new_message(
             source: author_data.id,
             reason: "Talked below an infected player".to_string(),
             recorded_at: helpers::now() as i64,
+            target_messages: total_messages,
         }
         .save(&data.db_pool)
         .await?;

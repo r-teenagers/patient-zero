@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO players (id, infected, total_messages) VALUES (?, ?, 1)\n        ON CONFLICT (id) DO \n        UPDATE SET total_messages = total_messages + 1 WHERE id = ?\n        RETURNING (total_messages)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "total_messages",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5ae714e8b9c0d01e8dfbd87d9df443f5675e578000d690bcbcb73f1d10458f4b"
+}

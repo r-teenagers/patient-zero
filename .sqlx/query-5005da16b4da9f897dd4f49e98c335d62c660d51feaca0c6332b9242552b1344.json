@@ -12,12 +12,18 @@
         "name": "infected",
         "ordinal": 1,
         "type_info": "Bool"
+      },
+      {
+        "name": "total_messages",
+        "ordinal": 2,
+        "type_info": "Integer"
       }
     ],
     "parameters": {
       "Right": 1
     },
     "nullable": [
+      false,
       false,
       false
     ]
