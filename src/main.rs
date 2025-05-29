@@ -4,7 +4,10 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
-use color_eyre::{Result, eyre::WrapErr};
+use color_eyre::{
+    Result,
+    eyre::{Error, WrapErr},
+};
 use helpers::{MessageBuffer, SyncMap};
 use poise::serenity_prelude as serenity;
 use serenity::GatewayIntents;
@@ -27,12 +30,9 @@ struct Data {
     /// map of channel IDs to the ID of the last user to message there
     channels: SyncMap<u64, MessageBuffer<10>>,
     game_config: config::GameConfig,
-    /// map of player ID to infected status
-    player_cache: SyncMap<u64, bool>,
     db_pool: SqlitePool,
 }
 
-type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
 async fn event_handler(
@@ -87,7 +87,7 @@ async fn main() -> Result<(), Error> {
 
     let framework = poise::Framework::<Data, Error>::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![commands::ping()],
+            commands: vec![commands::ping(), commands::infect()],
             event_handler: |ctx, event, framework, data| {
                 Box::pin(event_handler(ctx, event, framework, data))
             },
@@ -100,7 +100,6 @@ async fn main() -> Result<(), Error> {
                     started_at: helpers::now(),
                     game_config: config.game,
                     channels: SyncMap::new(),
-                    player_cache: SyncMap::new(),
                     db_pool: pool,
                 })
             })

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT recorded_at FROM infection_records WHERE source = ? ORDER BY recorded_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "recorded_at",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4d2f1a13853528f5fa584cf3e7bf58b77f6db85516c196d47dc7ed38c95e008b"
+}

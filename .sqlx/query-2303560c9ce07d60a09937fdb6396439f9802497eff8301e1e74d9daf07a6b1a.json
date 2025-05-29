@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT * FROM players WHERE id = ?",
+  "query": "SELECT id, infected FROM players WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -12,11 +12,6 @@
         "name": "infected",
         "ordinal": 1,
         "type_info": "Bool"
-      },
-      {
-        "name": "total_messages",
-        "ordinal": 2,
-        "type_info": "Integer"
       }
     ],
     "parameters": {
@@ -24,9 +19,8 @@
     },
     "nullable": [
       false,
-      false,
       false
     ]
   },
-  "hash": "5005da16b4da9f897dd4f49e98c335d62c660d51feaca0c6332b9242552b1344"
+  "hash": "2303560c9ce07d60a09937fdb6396439f9802497eff8301e1e74d9daf07a6b1a"
 }

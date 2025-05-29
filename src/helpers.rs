@@ -6,7 +6,7 @@ use std::{
 };
 
 use color_eyre::{Result, eyre::bail};
-use tokio::sync::{Mutex, OwnedMutexGuard, RwLock};
+use tokio::sync::{Mutex, RwLock};
 
 /// A simple ring buffer to maintain the last `CAPACITY` message IDs/users in a channel
 /// This is only used to keep a VERY small cache of the last few users in the channel
@@ -17,8 +17,8 @@ pub struct MessageBuffer<const CAPACITY: usize> {
     /// points to the last element insterted into the list
     ptr: usize,
     size: usize,
-    /// (user, msg) snowflakes
-    data: Vec<(u64, u64)>,
+    /// (user id, msg id, timestamp)
+    data: Vec<(u64, u64, u64)>,
 }
 
 impl<const CAPACITY: usize> MessageBuffer<CAPACITY> {
@@ -27,22 +27,23 @@ impl<const CAPACITY: usize> MessageBuffer<CAPACITY> {
         Self {
             ptr: 0,
             size: 0,
-            data: vec![(0, 0); CAPACITY],
+            data: vec![(0, 0, 0); CAPACITY],
         }
     }
 
     /// Returns the last user to send a message in the channel
+    /// returns (`user id`, `message id`, `timestamp` (unix secs))
     #[must_use]
-    pub fn get_last(&self) -> Option<u64> {
+    pub fn get_last_message(&self) -> Option<(u64, u64, u64)> {
         if self.size == 0 {
             return None;
         }
 
-        Some(self.data[self.ptr].0)
+        Some(self.data[self.ptr])
     }
 
     /// Appends a message to the ring buffer.
-    pub fn push(&mut self, author_id: u64, msg_id: u64) {
+    pub fn push(&mut self, author_id: u64, msg_id: u64, timestamp: u64) {
         if self.size != 0 {
             self.ptr = Self::wrapping_inc(self.ptr);
         }
@@ -51,7 +52,7 @@ impl<const CAPACITY: usize> MessageBuffer<CAPACITY> {
             self.size += 1
         }
 
-        self.data[self.ptr] = (author_id, msg_id)
+        self.data[self.ptr] = (author_id, msg_id, timestamp)
     }
 
     /// Removes a message by ID. Retains at least one message.

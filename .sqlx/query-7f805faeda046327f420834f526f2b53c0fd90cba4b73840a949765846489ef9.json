@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO players (id, infected) VALUES (?, true)\n        ON CONFLICT (id) DO UPDATE SET infected = true, last_action = unixepoch()\n        RETURNING total_messages, sanitized_messages\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "total_messages",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "sanitized_messages",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "7f805faeda046327f420834f526f2b53c0fd90cba4b73840a949765846489ef9"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT infected FROM players WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "infected",
+        "ordinal": 0,
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4366c48e6825198951940d90970db0373997467f4372a87df5981a5a66c9d0ca"
+}

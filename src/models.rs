@@ -7,6 +7,8 @@ pub struct Player {
     pub id: String,
     pub infected: bool,
     pub total_messages: i64,
+    pub sanitized_messages: i64,
+    pub last_action: i64,
 }
 
 #[derive(sqlx::Type)]
@@ -23,18 +25,24 @@ pub struct InfectionRecord {
     pub reason: String,
     pub recorded_at: i64,
     pub target_messages: i64,
+    pub target_sanitized_messages: i64,
 }
 
 impl InfectionRecord {
     pub async fn save(self, e: impl SqliteExecutor<'_>) -> Result<()> {
         sqlx::query!(
-            "INSERT INTO infection_records (event, target, source, reason, recorded_at, target_messages) VALUES (?, ?, ?, ?, ?, ?)",
+            r#"
+            INSERT INTO infection_records 
+            (event, target, source, reason, recorded_at, target_total_messages, target_sanitized_messages) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            "#,
             self.event,
             self.target,
             self.source,
             self.reason,
             self.recorded_at,
             self.target_messages,
+            self.target_sanitized_messages,
         ).execute(e).await?;
         Ok(())
     }

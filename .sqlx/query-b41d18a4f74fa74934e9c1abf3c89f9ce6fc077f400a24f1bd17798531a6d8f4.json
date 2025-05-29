@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO players (id, total_messages, sanitized_messages) VALUES (?, 1, 1)\n        ON CONFLICT (id) DO UPDATE SET\n            total_messages = total_messages + 1,\n            sanitized_messages =\n                CASE WHEN unixepoch() - last_action > ?\n                THEN sanitized_messages + 1\n                ELSE sanitized_messages END,\n            last_action =\n                CASE WHEN unixepoch() - last_action > ?\n                THEN unixepoch()\n                ELSE last_action END\n        RETURNING total_messages, sanitized_messages\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "total_messages",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "sanitized_messages",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "b41d18a4f74fa74934e9c1abf3c89f9ce6fc077f400a24f1bd17798531a6d8f4"
+}

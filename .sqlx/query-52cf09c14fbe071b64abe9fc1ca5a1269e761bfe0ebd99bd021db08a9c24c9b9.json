@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE players SET infected = true WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "52cf09c14fbe071b64abe9fc1ca5a1269e761bfe0ebd99bd021db08a9c24c9b9"
+}

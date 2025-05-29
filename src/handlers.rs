@@ -1,3 +1,5 @@
+use ::serenity::all::CacheHttp;
+use color_eyre::Result;
 use poise::serenity_prelude as serenity;
 
 use crate::{
@@ -9,91 +11,132 @@ pub async fn new_message(
     ctx: &serenity::Context,
     data: &crate::Data,
     msg: &serenity::Message,
-) -> Result<(), crate::Error> {
+) -> Result<()> {
     if msg.author.bot {
         return Ok(());
     }
 
+    let Some(guild_id) = msg.guild_id else {
+        return Ok(());
+    };
+
     let player_id = msg.author.id.to_string();
 
-    // If the player's already cached to avoid hitting the db
-    // TODO: extract to functions to ensure sync between cache and db or remove?
-    let player_is_infected = match data.player_cache.get(&msg.author.id.get()).await {
-        Some(b) => *b.lock().await,
-        None => sqlx::query!("SELECT (infected) FROM players WHERE id = ?", player_id)
-            .fetch_optional(&data.db_pool)
-            .await?
-            .map_or(false, |p| p.infected),
-    };
+    // inserts a new player or adds to the previous player's message count **only if** the cooldown
+    // has passed
+    // maybe should just be handled in rust for cleanliness' sake?
+    let player = sqlx::query!(
+        r#"
+        INSERT INTO players (id, total_messages, sanitized_messages) VALUES (?, 1, 1)
+        ON CONFLICT (id) DO UPDATE SET
+            total_messages = total_messages + 1,
+            sanitized_messages =
+                CASE WHEN unixepoch() - last_action > ?
+                THEN sanitized_messages + 1
+                ELSE sanitized_messages END,
+            last_action =
+                CASE WHEN unixepoch() - last_action > ?
+                THEN unixepoch()
+                ELSE last_action END
+        RETURNING total_messages, sanitized_messages
+        "#,
+        player_id,
+        data.game_config.message_cooldown,
+        data.game_config.message_cooldown,
+    )
+    .fetch_one(&data.db_pool)
+    .await?;
+
+    trace!(
+        "player {} has {} messages ({} sanitized)",
+        player_id, player.total_messages, player.sanitized_messages,
+    );
+
+    // TODO: add a cache for player infection state?
+    let player_is_infected = sqlx::query!("SELECT infected FROM players WHERE id = ?", player_id)
+        .fetch_optional(&data.db_pool)
+        .await?
+        .map_or(false, |p| p.infected);
 
     if player_is_infected {
         trace!("player is already infected, checking if they need to be cured");
-        return handle_cure(data, player_id);
+        return handle_cure(data, player_id).await;
     }
 
     trace!("player is not infected, checking if they should be");
 
-    let last_author = {
+    let last_message = {
         let buf = data.channels.get_or_insert(&msg.channel_id.get()).await;
         let mut buf = buf.lock().await;
-        let last_author = buf.get_last();
-        buf.push(msg.author.id.get(), msg.id.get());
-        last_author
+        let last_message = buf.get_last_message();
+        buf.push(
+            msg.author.id.get(),
+            msg.id.get(),
+            // why can't people settle on a standard type for unix timestamps :/
+            msg.timestamp.unix_timestamp().try_into().unwrap(),
+        );
+        last_message
     };
 
-    // last_author may not actually exist if the message was sent before the bot started;
+    // last_message may not actually exist if the message was sent before the bot started;
     // if not, they cannot possibly be infected anyway
-    let author_data = match last_author {
-        Some(a) => {
-            let a = a.to_string();
-            sqlx::query_as!(Player, "SELECT * FROM players WHERE id = ?", a)
+    let author_data = match last_message {
+        Some(m) => {
+            let a = m.0.to_string();
+            sqlx::query!("SELECT id, infected FROM players WHERE id = ?", a)
                 .fetch_optional(&data.db_pool)
                 .await?
         }
         None => None,
     };
 
+    // only infect the player if the previous message is infected *and* they haven't infected
+    // anyone within the cooldown
     let should_infect = match author_data {
-        Some(ref a) => a.infected,
-        None => false,
+        Some(ref a) if a.infected => sqlx::query!(
+            "SELECT recorded_at FROM infection_records WHERE source = ? ORDER BY recorded_at DESC",
+            a.id
+        )
+        .fetch_optional(&data.db_pool)
+        .await?
+        .map_or(false, |r| {
+            helpers::now() - r.recorded_at as u64 > data.game_config.infection_cooldown as u64
+        }),
+        _ => false,
     };
 
-    let total_messages = sqlx::query!(
-        r#"
-        INSERT INTO players (id, infected, total_messages) VALUES (?, ?, 1)
-        ON CONFLICT (id) DO 
-        UPDATE SET total_messages = total_messages + 1 WHERE id = ?
-        RETURNING (total_messages)
-        "#,
-        player_id,
-        should_infect,
-        player_id,
-    )
-    .fetch_one(&data.db_pool)
-    .await?
-    .total_messages;
-
-    trace!("player {} has {} messages", player_id, total_messages);
-
     if should_infect {
-        trace!("infecting player {}", player_id);
         let author_data = author_data.unwrap();
+        info!("Player {} infected by {}", player_id, author_data.id);
+
+        // TODO: possibly just combine with the above query for updating message count
+        sqlx::query!("UPDATE players SET infected = true WHERE id = ?", player_id)
+            .execute(&data.db_pool)
+            .await?;
+
         InfectionRecord {
             event: InfectionEvent::Infected,
             target: player_id,
-            source: author_data.id,
-            reason: "Talked below an infected player".to_string(),
+            source: author_data.id.clone(),
+            reason: format!("Infected by proximity to <@{}>", author_data.id),
             recorded_at: helpers::now() as i64,
-            target_messages: total_messages,
+            target_messages: player.total_messages,
+            target_sanitized_messages: player.sanitized_messages,
         }
         .save(&data.db_pool)
         .await?;
+
+        guild_id
+            .member(ctx.http(), msg.author.id)
+            .await?
+            .add_role(ctx.http(), data.game_config.infected_role)
+            .await?;
     }
 
     Ok(())
 }
 
-async fn handle_cure(data: &crate::Data, player_id: String) -> Result<(), crate::Error> {
+async fn handle_cure(data: &crate::Data, player_id: String) -> Result<()> {
     warn!("TODO: check for cure");
     Ok(())
 }
