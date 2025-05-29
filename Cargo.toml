@@ -12,8 +12,8 @@ serenity = { version = "0.12.4", default-features = false, features = ["builder"
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls", "sqlite", "derive", "macros", "migrate"] }
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread"] }
 toml = "0.8.22"
-tracing = { version = "0.1.41", features = ["release_max_level_info", "max_level_debug"] }
-tracing-subscriber = { version = "0.3.19", features = ["tracing-log"] }
+tracing = { version = "0.1.41", features = ["release_max_level_info", "max_level_trace"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "tracing-log"] }
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3

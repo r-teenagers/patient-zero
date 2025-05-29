@@ -14,27 +14,30 @@ pub async fn new_message(
         return Ok(());
     }
 
-    info!("new message {}", msg.content);
+    let player_id = msg.author.id.to_string();
 
-    // FIXME: maybe don't lock on every message if possible? or have per-channel locks?
-    // this probably isn't slow enough to actually matter it's just really gross
+    // If the player's already cached to avoid hitting the db
+    // TODO: extract to functions to ensure sync between cache and db or remove?
+    let player_is_infected = match data.player_cache.get(&msg.author.id.get()).await {
+        Some(b) => *b.lock().await,
+        None => sqlx::query!("SELECT (infected) FROM players WHERE id = ?", player_id)
+            .fetch_optional(&data.db_pool)
+            .await?
+            .map_or(false, |p| p.infected),
+    };
+
+    if player_is_infected {
+        trace!("player is already infected, checking if they need to be cured");
+        return handle_cure(data, player_id);
+    }
+
+    trace!("player is not infected, checking if they should be");
+
     let last_author = {
-        let mut channels = data.channels.lock().await;
-
-        // gets a mutable reference or inserts and returns one
-        // FIXME: i'm sleep deprived
-        let buf: &mut MessageBuffer<10> = match channels.get_mut(&msg.channel_id.get()) {
-            Some(buf) => buf,
-            None => {
-                let mb = MessageBuffer::new();
-                channels.insert(msg.channel_id.get(), mb);
-                channels.get_mut(&msg.channel_id.get()).unwrap()
-            }
-        };
-
+        let buf = data.channels.get_or_insert(&msg.channel_id.get()).await;
+        let mut buf = buf.lock().await;
         let last_author = buf.get_last();
         buf.push(msg.author.id.get(), msg.id.get());
-        trace!("buffer for {}: {:?}", msg.channel_id, buf);
         last_author
     };
 
@@ -55,7 +58,6 @@ pub async fn new_message(
         None => false,
     };
 
-    let player_id = msg.author.id.to_string();
     let total_messages = sqlx::query!(
         r#"
         INSERT INTO players (id, infected, total_messages) VALUES (?, ?, 1)
@@ -71,9 +73,10 @@ pub async fn new_message(
     .await?
     .total_messages;
 
-    debug!("player {} has {} messages", player_id, total_messages);
+    trace!("player {} has {} messages", player_id, total_messages);
 
     if should_infect {
+        trace!("infecting player {}", player_id);
         let author_data = author_data.unwrap();
         InfectionRecord {
             event: InfectionEvent::Infected,
@@ -87,5 +90,10 @@ pub async fn new_message(
         .await?;
     }
 
+    Ok(())
+}
+
+async fn handle_cure(data: &crate::Data, player_id: String) -> Result<(), crate::Error> {
+    warn!("TODO: check for cure");
     Ok(())
 }

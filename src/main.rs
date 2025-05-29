@@ -5,13 +5,13 @@ use std::{
 };
 
 use color_eyre::{Result, eyre::WrapErr};
-use helpers::MessageBuffer;
+use helpers::{MessageBuffer, SyncMap};
 use poise::serenity_prelude as serenity;
 use serenity::GatewayIntents;
 use sqlx::SqlitePool;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tracing::Level;
-use tracing_subscriber::{filter, prelude::*};
+use tracing_subscriber::{EnvFilter, filter, prelude::*};
 
 #[macro_use]
 extern crate tracing;
@@ -25,8 +25,10 @@ mod models;
 struct Data {
     started_at: u64,
     /// map of channel IDs to the ID of the last user to message there
-    channels: Mutex<HashMap<u64, MessageBuffer<10>>>,
+    channels: SyncMap<u64, MessageBuffer<10>>,
     game_config: config::GameConfig,
+    /// map of player ID to infected status
+    player_cache: SyncMap<u64, bool>,
     db_pool: SqlitePool,
 }
 
@@ -64,10 +66,13 @@ async fn event_handler(
 async fn main() -> Result<(), Error> {
     color_eyre::install()?;
 
-    let filter = filter::Targets::new().with_target("patient_zero", Level::TRACE);
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_target(false))
-        .with(filter)
+        .with(
+            EnvFilter::builder()
+                .with_default_directive("patient_zero=info".parse().unwrap())
+                .from_env_lossy(),
+        )
         .init();
 
     let config = config::load(&Path::new("./pzero.toml")).expect("pzero.toml not found!");
@@ -94,7 +99,8 @@ async fn main() -> Result<(), Error> {
                 Ok(Data {
                     started_at: helpers::now(),
                     game_config: config.game,
-                    channels: Mutex::new(HashMap::new()),
+                    channels: SyncMap::new(),
+                    player_cache: SyncMap::new(),
                     db_pool: pool,
                 })
             })

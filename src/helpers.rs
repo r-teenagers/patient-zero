@@ -1,6 +1,12 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::HashMap,
+    hash::Hash,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use color_eyre::{Result, eyre::bail};
+use tokio::sync::{Mutex, OwnedMutexGuard, RwLock};
 
 /// A simple ring buffer to maintain the last `CAPACITY` message IDs/users in a channel
 /// This is only used to keep a VERY small cache of the last few users in the channel
@@ -99,4 +105,57 @@ pub fn now() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs()
+}
+
+impl<const CAPACITY: usize> Default for MessageBuffer<CAPACITY> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A RwLock<HashMap<T, Arc<Mutex<U>>>> with some nice wrapper functions
+/// this isn't a super small data structure by any means but it's certainly smaller than enabling
+/// the entire Discord cache
+pub struct SyncMap<K, V>(RwLock<HashMap<K, Arc<Mutex<V>>>>);
+
+impl<K, V> SyncMap<K, V>
+where
+    K: Eq + Hash + Clone,
+    V: Default,
+{
+    pub fn new() -> Self {
+        Self(RwLock::new(HashMap::new()))
+    }
+
+    /// uses a read lock on the map. only writes if the key does not yet exist.
+    /// Returns the mutex wrapping the value. Intentionally doesn't lock to allow the user to
+    /// decide the semantics of allat
+    pub async fn get_or_insert(&self, key: &K) -> Arc<Mutex<V>> {
+        let mut map = self.0.read().await;
+
+        let v = match map.get(&key) {
+            Some(key) => key,
+            None => {
+                drop(map);
+                let mut map_write = self.0.write().await;
+                map_write.insert(key.clone(), Arc::new(Mutex::new(V::default())));
+                drop(map_write);
+                map = self.0.read().await;
+                map.get(&key).unwrap()
+            }
+        };
+
+        v.clone()
+    }
+
+    pub async fn set(&self, key: &K, value: V) {
+        let v = self.get_or_insert(key).await;
+        let mut v = v.lock().await;
+        *v = value;
+    }
+
+    pub async fn get(&self, key: &K) -> Option<Arc<Mutex<V>>> {
+        let map = self.0.read().await;
+        map.get(key).cloned()
+    }
 }
