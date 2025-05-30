@@ -24,6 +24,8 @@ pub struct GameConfig {
     pub carrier_roles: Option<Vec<u64>>,
     /// The number of messages that must be sent while infected to be cured
     pub cure_threshold: u32,
+    /// The max amount of time before a player is cured automatically (seconds)
+    pub cure_timeout: Option<u64>,
     /// The minimum amount of time between messages being counted towards curing
     pub message_cooldown: u32,
     /// The minimum amount of time between infections from one person

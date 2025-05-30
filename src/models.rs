@@ -1,5 +1,5 @@
 use color_eyre::Result;
-use sqlx::{Database, Executor, SqliteExecutor};
+use sqlx::SqliteExecutor;
 
 pub struct Player {
     // this is disgusting - converting to a string is gross but unfortunately
@@ -18,13 +18,22 @@ pub enum InfectionEvent {
     Cured,
 }
 
+impl From<String> for InfectionEvent {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "cured" => Self::Cured,
+            _ => Self::Infected,
+        }
+    }
+}
+
 pub struct InfectionRecord {
     pub event: InfectionEvent,
     pub target: String,
-    pub source: String,
-    pub reason: String,
+    pub source: Option<String>,
+    pub reason: Option<String>,
     pub recorded_at: i64,
-    pub target_messages: i64,
+    pub target_total_messages: i64,
     pub target_sanitized_messages: i64,
 }
 
@@ -32,7 +41,7 @@ impl InfectionRecord {
     pub async fn save(self, e: impl SqliteExecutor<'_>) -> Result<()> {
         sqlx::query!(
             r#"
-            INSERT INTO infection_records 
+            INSERT INTO infection_records
             (event, target, source, reason, recorded_at, target_total_messages, target_sanitized_messages) 
             VALUES (?, ?, ?, ?, ?, ?, ?)
             "#,
@@ -41,7 +50,7 @@ impl InfectionRecord {
             self.source,
             self.reason,
             self.recorded_at,
-            self.target_messages,
+            self.target_total_messages,
             self.target_sanitized_messages,
         ).execute(e).await?;
         Ok(())

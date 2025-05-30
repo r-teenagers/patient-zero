@@ -134,7 +134,7 @@ where
     pub async fn get_or_insert(&self, key: &K) -> Arc<Mutex<V>> {
         let mut map = self.0.read().await;
 
-        let v = match map.get(&key) {
+        let v = match map.get(key) {
             Some(key) => key,
             None => {
                 drop(map);
@@ -142,7 +142,7 @@ where
                 map_write.insert(key.clone(), Arc::new(Mutex::new(V::default())));
                 drop(map_write);
                 map = self.0.read().await;
-                map.get(&key).unwrap()
+                map.get(key).unwrap()
             }
         };
 

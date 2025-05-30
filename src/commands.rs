@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use color_eyre::Result;
 use poise::CreateReply;
-use serenity::all::{Member, UserId};
+use serenity::all::Member;
 
 use crate::{
     helpers,
@@ -62,10 +62,10 @@ pub async fn infect(ctx: crate::Context<'_>, target: Member) -> Result<()> {
     InfectionRecord {
         event: InfectionEvent::Infected,
         target: player_id,
-        source: author_id.clone(),
-        reason: format!("Manually infected by <@{}>", author_id),
+        source: Some(author_id.clone()),
+        reason: Some(format!("Manually infected by <@{}>", author_id)),
         recorded_at: helpers::now() as i64,
-        target_messages: player.total_messages,
+        target_total_messages: player.total_messages,
         target_sanitized_messages: player.sanitized_messages,
     }
     .save(&data.db_pool)
@@ -98,10 +98,10 @@ pub async fn cure(ctx: crate::Context<'_>, target: Member) -> Result<()> {
     InfectionRecord {
         event: InfectionEvent::Cured,
         target: player_id,
-        source: author_id.clone(),
-        reason: format!("Manually cured by <@{}>", author_id),
+        source: Some(author_id.clone()),
+        reason: Some(format!("Manually cured by <@{}>", author_id)),
         recorded_at: helpers::now() as i64,
-        target_messages: player.total_messages,
+        target_total_messages: player.total_messages,
         target_sanitized_messages: player.sanitized_messages,
     }
     .save(&data.db_pool)

@@ -1,10 +1,10 @@
-use ::serenity::all::CacheHttp;
+use ::serenity::all::{CacheHttp, GuildId, UserId};
 use color_eyre::Result;
 use poise::serenity_prelude as serenity;
 
 use crate::{
-    helpers::{self, MessageBuffer},
-    models::{InfectionEvent, InfectionRecord, Player},
+    helpers::{self},
+    models::{InfectionEvent, InfectionRecord},
 };
 
 pub async fn new_message(
@@ -56,11 +56,11 @@ pub async fn new_message(
     let player_is_infected = sqlx::query!("SELECT infected FROM players WHERE id = ?", player_id)
         .fetch_optional(&data.db_pool)
         .await?
-        .map_or(false, |p| p.infected);
+        .is_some_and(|p| p.infected);
 
     if player_is_infected {
         trace!("player is already infected, checking if they need to be cured");
-        return handle_cure(data, player_id).await;
+        return check_cure(ctx, data, msg.author.id, guild_id).await;
     }
 
     trace!("player is not infected, checking if they should be");
@@ -99,7 +99,7 @@ pub async fn new_message(
         )
         .fetch_optional(&data.db_pool)
         .await?
-        .map_or(false, |r| {
+        .is_some_and(|r| {
             helpers::now() - r.recorded_at as u64 > data.game_config.infection_cooldown as u64
         }),
         _ => false,
@@ -117,10 +117,10 @@ pub async fn new_message(
         InfectionRecord {
             event: InfectionEvent::Infected,
             target: player_id,
-            source: author_data.id.clone(),
-            reason: format!("Infected by proximity to <@{}>", author_data.id),
+            source: Some(author_data.id.clone()),
+            reason: Some(format!("Infected by proximity to <@{}>", author_data.id)),
             recorded_at: helpers::now() as i64,
-            target_messages: player.total_messages,
+            target_total_messages: player.total_messages,
             target_sanitized_messages: player.sanitized_messages,
         }
         .save(&data.db_pool)
@@ -136,7 +136,72 @@ pub async fn new_message(
     Ok(())
 }
 
-async fn handle_cure(data: &crate::Data, player_id: String) -> Result<()> {
-    warn!("TODO: check for cure");
+async fn check_cure(
+    ctx: &serenity::Context,
+    data: &crate::Data,
+    player_id: UserId,
+    guild_id: GuildId,
+) -> Result<()> {
+    let player_id_str = player_id.to_string();
+    let player = sqlx::query!("SELECT * FROM players WHERE id = ?", player_id_str)
+        .fetch_one(&data.db_pool)
+        .await?;
+
+    let action = sqlx::query!(
+        "SELECT recorded_at, target_sanitized_messages FROM infection_records WHERE target = ? AND event = 'infected' ORDER BY recorded_at DESC",
+        player_id_str
+    )
+    .fetch_one(&data.db_pool)
+    .await?;
+
+    // FIXME: move timeout checking out of this function - just sweep every few minutes instead?
+    let cure_reason = if player.sanitized_messages - action.target_sanitized_messages
+        > data.game_config.cure_threshold.into()
+    {
+        format!(
+            "Sent {} messages while infected",
+            data.game_config.cure_threshold
+        )
+    } else if data
+        .game_config
+        .cure_timeout
+        .is_some_and(|t| helpers::now() - action.recorded_at as u64 > t)
+    {
+        format!(
+            "Was infected for more than {} seconds",
+            data.game_config.cure_timeout.unwrap()
+        )
+    } else {
+        return Ok(());
+    };
+
+    info!("Player {} cured", player_id);
+
+    // TODO: possibly just combine with the above query for updating message count
+    sqlx::query!(
+        "UPDATE players SET infected = true WHERE id = ?",
+        player_id_str
+    )
+    .execute(&data.db_pool)
+    .await?;
+
+    InfectionRecord {
+        event: InfectionEvent::Infected,
+        target: player_id_str,
+        source: None,
+        reason: Some(cure_reason),
+        recorded_at: helpers::now() as i64,
+        target_total_messages: player.total_messages,
+        target_sanitized_messages: player.sanitized_messages,
+    }
+    .save(&data.db_pool)
+    .await?;
+
+    guild_id
+        .member(ctx.http(), player_id)
+        .await?
+        .add_role(ctx.http(), data.game_config.infected_role)
+        .await?;
+
     Ok(())
 }

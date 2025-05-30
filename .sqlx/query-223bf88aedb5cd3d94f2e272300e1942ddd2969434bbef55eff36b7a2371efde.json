@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO infection_records\n            (event, target, source, reason, recorded_at, target_total_messages, target_sanitized_messages) \n            VALUES (?, ?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "223bf88aedb5cd3d94f2e272300e1942ddd2969434bbef55eff36b7a2371efde"
+}

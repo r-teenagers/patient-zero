@@ -1,20 +1,11 @@
-use std::{
-    collections::HashMap,
-    path::Path,
-    time::{Instant, SystemTime, UNIX_EPOCH},
-};
+use std::path::Path;
 
-use color_eyre::{
-    Result,
-    eyre::{Error, WrapErr},
-};
+use color_eyre::{Result, eyre::Error};
 use helpers::{MessageBuffer, SyncMap};
 use poise::serenity_prelude as serenity;
 use serenity::GatewayIntents;
 use sqlx::SqlitePool;
-use tokio::sync::{Mutex, RwLock};
-use tracing::Level;
-use tracing_subscriber::{EnvFilter, filter, prelude::*};
+use tracing_subscriber::{EnvFilter, prelude::*};
 
 #[macro_use]
 extern crate tracing;
@@ -75,7 +66,7 @@ async fn main() -> Result<(), Error> {
         )
         .init();
 
-    let config = config::load(&Path::new("./pzero.toml")).expect("pzero.toml not found!");
+    let config = config::load(Path::new("./pzero.toml")).expect("pzero.toml not found!");
 
     let pool = SqlitePool::connect(&config.bot.db_url).await?;
     sqlx::migrate!().run(&pool).await?;

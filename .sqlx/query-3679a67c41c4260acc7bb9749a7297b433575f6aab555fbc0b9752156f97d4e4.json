@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT recorded_at, target_sanitized_messages FROM infection_records WHERE target = ? AND event = 'infected' ORDER BY recorded_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "recorded_at",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "target_sanitized_messages",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "3679a67c41c4260acc7bb9749a7297b433575f6aab555fbc0b9752156f97d4e4"
+}
